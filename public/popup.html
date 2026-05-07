@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ChatGPT Interview</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header class="app-header">
+        <div class="brand-mark" aria-hidden="true">
+          <img class="brand-mark-image" src="icons/chatgpt-icon.png" alt="">
+        </div>
+        <div class="header-copy">
+          <div class="title-row">
+            <h1>ChatGPT Interview <span id="appVersion" class="app-version"></span></h1>
+            <button id="signOutButton" class="header-sign-out-button" type="button" hidden>Sign out</button>
+          </div>
+          <div class="account-row">
+            <div class="account-meta">
+              <p id="accountLabel">Not signed in</p>
+              <span id="planLabel" class="plan-label" hidden>Free</span>
+            </div>
+            <div id="headerLimits" class="limit-control" hidden>
+              <div id="limitList" class="limit-list">No limit data yet.</div>
+              <button id="limitRefreshButton" class="refresh-button" type="button" title="Refresh limits" aria-label="Refresh limits">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M20 12a8 8 0 0 1-13.66 5.66M4 12A8 8 0 0 1 17.66 6.34M17 3v4h-4M7 21v-4h4"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="panel stt-panel">
+        <div class="stt-header">
+          <div>
+            <strong>Deepgram Speech to Text</strong>
+            <p class="muted">Required for microphone and tab-audio transcription.</p>
+          </div>
+          <button id="deepgramSignupButton" class="footer-link" type="button">Get free API key</button>
+        </div>
+        <div class="deepgram-row">
+          <input id="deepgramApiKeyInput" type="password" autocomplete="off" placeholder="Deepgram API key">
+          <button id="testDeepgramButton" class="mini-button" type="button">Test</button>
+        </div>
+        <p id="deepgramStatus" class="muted"></p>
+      </section>
+
+      <section id="signedOutView" class="panel">
+        <p id="authStatus" class="muted">Sign in with ChatGPT to generate interview answers from live transcripts.</p>
+        <button id="loginButton" class="primary-button" type="button">Sign in with ChatGPT</button>
+      </section>
+
+      <section id="cvPanel" class="panel cv-card" hidden>
+        <div class="cv-panel">
+          <input id="cvFileInput" type="file" accept="application/pdf,.pdf" hidden>
+          <span id="cvStatus" class="muted">No CV loaded.</span>
+          <button id="uploadCvButton" class="mini-button" type="button">Upload CV</button>
+          <button id="removeCvButton" class="mini-button danger-mini-button" type="button" hidden>Remove</button>
+        </div>
+      </section>
+
+      <section id="signedInView" class="panel" hidden>
+        <div class="settings-toolbar">
+          <select id="modelSelect" title="Model" aria-label="Model"></select>
+
+          <div class="thinking-control">
+            <select id="thinkingSelect" title="Thinking" aria-label="Thinking"></select>
+            <button id="modelRefreshButton" class="refresh-button" type="button" title="Refresh models and thinking variants" aria-label="Refresh models and thinking variants">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 12a8 8 0 0 1-13.66 5.66M4 12A8 8 0 0 1 17.66 6.34M17 3v4h-4M7 21v-4h4"></path>
+              </svg>
+            </button>
+          </div>
+
+        </div>
+
+        <p id="mainStatus" class="muted"></p>
+      </section>
+
+      <button id="openAssistantButton" class="primary-button open-assistant-button" type="button" hidden>Open Assistant</button>
+
+      <footer class="app-footer">
+        <button id="developerLink" class="footer-link" type="button">Developed by Barış Kısır</button>
+        <button id="sourceLink" class="footer-link" type="button">Source</button>
+      </footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
