@@ -14,7 +14,6 @@ import {
   detectInterviewQuestion
 } from '../features/assistant';
 import { getStatus, refreshLimits, refreshModels } from '../features/status';
-import { rebuildContextMenus } from './contextMenus';
 import type { RuntimeRequest, Result, StatusPayload, TabMessage } from '../shared/types';
 
 type RuntimeResponse = Result | StatusPayload;
@@ -50,7 +49,7 @@ async function dispatch(message: RuntimeRequest, sender: chrome.runtime.MessageS
     case 'auth.start':
       return startLogin();
     case 'auth.signOut':
-      return signOut(() => rebuildContextMenus());
+      return signOut();
     case 'status.get':
       return getStatus();
     case 'catalog.refreshModels':
@@ -125,4 +124,3 @@ function resolveAndRespond(
       sendResponse(toErrorResult(error));
     });
 }
-

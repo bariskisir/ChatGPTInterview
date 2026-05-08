@@ -52,11 +52,10 @@ export function isOAuthCallbackUrl(url = ''): boolean {
   return url.startsWith(APP_URLS.oauthRedirect);
 }
 
-/** Completes the OAuth flow, stores tokens, refreshes menus, and closes the callback tab. */
+/** Completes the OAuth flow, stores tokens, and closes the callback tab. */
 export async function handleOAuthCallback(
   callbackUrl: string,
-  tabId: number,
-  onAuthChanged: () => Promise<void>
+  tabId: number
 ): Promise<void> {
   const { auth } = await getStorage('auth');
   if (!auth?.pendingOAuth) {
@@ -94,7 +93,6 @@ export async function handleOAuthCallback(
       auth: authWithoutPending,
       catalog
     });
-    await onAuthChanged();
     await closeTab(tabId);
     broadcastRuntimeMessage({ action: 'event.authChanged' });
   } catch (error) {
@@ -115,10 +113,9 @@ export async function isLoggedIn(): Promise<boolean> {
   return Boolean(auth?.accessToken || auth?.refreshToken);
 }
 
-/** Clears all stored auth and UI state, then refreshes menus and popup listeners. */
-export async function signOut(onAuthChanged: () => Promise<void>): Promise<Result> {
+/** Clears all stored auth and UI state, then notifies popup listeners. */
+export async function signOut(): Promise<Result> {
   await removeStorage(STORAGE_KEYS);
-  await onAuthChanged();
   broadcastRuntimeMessage({ action: 'event.authChanged' });
   return { ok: true };
 }

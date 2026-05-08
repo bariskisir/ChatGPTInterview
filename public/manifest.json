@@ -30,7 +30,6 @@
   },
   "permissions": [
     "activeTab",
-    "contextMenus",
     "scripting",
     "storage",
     "offscreen",
