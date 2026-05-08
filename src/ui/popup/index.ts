@@ -17,6 +17,8 @@ import type { AvailableModel, LimitInfo, StatusPayload, ThinkingVariant } from '
 const signedOutView = requireElement('signedOutView');
 const signedInView = requireElement('signedInView');
 const cvPanel = requireElement('cvPanel');
+const deepgramPanel = requireElement('deepgramPanel');
+const secondaryPanels = requireElement('secondaryPanels');
 const appVersion = requireElement('appVersion');
 const accountLabel = requireElement('accountLabel');
 const authStatus = requireElement('authStatus');
@@ -43,12 +45,13 @@ const thinkingSelect = requireSelect('thinkingSelect');
 const deepgramStatus = requireElement('deepgramStatus');
 
 let currentModels: AvailableModel[] = [];
+let savedDeepgramApiKey = '';
+let isChatGptLoggedIn = false;
 
 document.addEventListener('DOMContentLoaded', () => {
   bindEvents();
   renderVersion();
-  void loadDeepgramApiKey();
-  void refreshStatus();
+  void initializePopup();
 });
 
 chrome.runtime.onMessage.addListener((incoming: unknown) => {
@@ -89,11 +92,12 @@ function bindEvents(): void {
   thinkingSelect.addEventListener('change', () => {
     void saveThinkingChoice();
   });
-  deepgramApiKeyInput.addEventListener('change', () => {
-    void saveDeepgramApiKey();
-  });
-  deepgramApiKeyInput.addEventListener('blur', () => {
-    void saveDeepgramApiKey();
+  deepgramApiKeyInput.addEventListener('input', () => {
+    updateAssistantButtonState();
+    if (isChatGptLoggedIn && deepgramApiKeyInput.value.trim() !== savedDeepgramApiKey) {
+      renderDeepgramStatus('');
+      renderMainStatus('');
+    }
   });
   testDeepgramButton.addEventListener('click', () => {
     void testDeepgramApiKey();
@@ -101,6 +105,12 @@ function bindEvents(): void {
   deepgramSignupButton.addEventListener('click', () => openExternal(APP_URLS.deepgramSignup));
   developerLink.addEventListener('click', () => openExternal(APP_URLS.developer));
   sourceLink.addEventListener('click', () => openExternal(APP_URLS.source));
+}
+
+/** Loads persisted popup data before the first status render. */
+async function initializePopup(): Promise<void> {
+  await loadDeepgramApiKey();
+  await refreshStatus();
 }
 
 /** Renders the manifest version in the popup header. */
@@ -118,16 +128,20 @@ async function refreshStatus(): Promise<void> {
   }
 
   currentModels = status.catalog.availableModels;
+  isChatGptLoggedIn = status.auth.loggedIn;
   accountLabel.textContent = status.auth.loggedIn
     ? status.auth.accountEmail || 'Signed in with ChatGPT'
     : 'Not signed in';
   signedOutView.hidden = status.auth.loggedIn;
-  signedInView.hidden = !status.auth.loggedIn;
-  cvPanel.hidden = !status.auth.loggedIn;
+  secondaryPanels.hidden = !status.auth.loggedIn;
+  signedInView.hidden = false;
+  cvPanel.hidden = false;
+  deepgramPanel.hidden = !status.auth.loggedIn;
   openButton.hidden = !status.auth.loggedIn;
   signOutButton.hidden = !status.auth.loggedIn;
   headerLimits.hidden = !status.auth.loggedIn;
   planLabel.hidden = !status.auth.loggedIn;
+  updateAssistantButtonState();
 
   if (status.auth.loggedIn) {
     renderLimits(status.catalog.limitInfo);
@@ -144,21 +158,13 @@ async function refreshStatus(): Promise<void> {
 /** Hydrates the Deepgram API key field from local extension storage. */
 async function loadDeepgramApiKey(): Promise<void> {
   const deepgram = await getDeepgramStorage();
-  deepgramApiKeyInput.value = deepgram.apiKey || '';
+  savedDeepgramApiKey = deepgram.apiKey || '';
+  deepgramApiKeyInput.value = savedDeepgramApiKey;
   const balanceLabel = deepgram.balanceLabel || '';
   renderDeepgramStatus(deepgramApiKeyInput.value.trim()
     ? ['API key saved locally.', balanceLabel].filter(Boolean).join(' ')
-    : 'Add a Deepgram API key before starting transcript.');
-}
-
-/** Persists the Deepgram API key locally without sending it to the backend. */
-async function saveDeepgramApiKey(): Promise<void> {
-  const apiKey = deepgramApiKeyInput.value.trim();
-  await persistDeepgramApiKey(apiKey);
-  if (!apiKey) {
-    renderDeepgramLimitRow('');
-  }
-  renderDeepgramStatus(apiKey ? 'API key saved locally.' : 'Add a Deepgram API key before starting transcript.', Boolean(apiKey));
+    : '');
+  updateAssistantButtonState();
 }
 
 /** Verifies Deepgram websocket access and refreshes management balance data. */
@@ -174,6 +180,9 @@ async function testDeepgramApiKey(): Promise<void> {
   try {
     await testDeepgramConnection(apiKey);
     await persistDeepgramApiKey(apiKey);
+    savedDeepgramApiKey = apiKey;
+    updateAssistantButtonState();
+    renderMainStatus('');
     try {
       const balanceLabel = await refreshDeepgramBalance(apiKey);
       renderDeepgramLimitRow(balanceLabel);
@@ -186,7 +195,7 @@ async function testDeepgramApiKey(): Promise<void> {
   } catch (error) {
     renderDeepgramStatus(error instanceof Error ? error.message : 'Deepgram API key test failed.', false);
   } finally {
-    setBusy(testDeepgramButton, false, 'Test');
+    setBusy(testDeepgramButton, false, 'Test & Save');
   }
 }
 
@@ -205,6 +214,11 @@ async function startLogin(): Promise<void> {
 
 /** Opens the assistant side panel and asks the background worker to bind it to the page. */
 async function openAssistant(): Promise<void> {
+  if (!hasSavedDeepgramKey()) {
+    renderMainStatus('Test & Save a Deepgram API key to enable the assistant.', false);
+    return;
+  }
+
   setBusy(openButton, true, 'Opening...');
   const sidePanelOpenTask = openAssistantSidePanelFromPopup();
   const assistantOpenTask = sendRuntimeMessage({ action: 'assistant.open' });
@@ -217,6 +231,7 @@ async function openAssistant(): Promise<void> {
     }
   } finally {
     setBusy(openButton, false, 'Open Assistant');
+    updateAssistantButtonState();
   }
 }
 
@@ -312,7 +327,7 @@ async function uploadCvProfile(): Promise<void> {
   } catch (error) {
     renderMainStatus(error instanceof Error ? error.message : 'Could not read CV file.', false);
   } finally {
-    setBusy(uploadCvButton, false, 'Upload CV');
+    setBusy(uploadCvButton, false, 'Select');
   }
 }
 
@@ -407,6 +422,7 @@ function renderDeepgramLimitRow(label: string): void {
 /** Renders the currently stored CV filename, size, and update date. */
 function renderCvStatus(status: StatusPayload): void {
   const hasProfile = Boolean(status.profile.text.trim());
+  uploadCvButton.hidden = hasProfile;
   removeCvButton.hidden = !hasProfile;
   if (!hasProfile) {
     cvStatus.textContent = 'No CV loaded.';
@@ -429,6 +445,7 @@ function renderAuthStatus(message: string, ok = true): void {
 /** Updates the main popup status line. */
 function renderMainStatus(message: string, ok = true): void {
   mainStatus.textContent = message;
+  mainStatus.hidden = !message;
   mainStatus.classList.toggle('error-text', !ok);
 }
 
@@ -446,7 +463,7 @@ async function testDeepgramConnection(apiKey: string): Promise<void> {
 
 /** Refreshes Deepgram balance data for the currently saved key. */
 async function refreshDeepgramBalanceForSavedKey(): Promise<void> {
-  const apiKey = deepgramApiKeyInput.value.trim();
+  const apiKey = savedDeepgramApiKey;
   if (!apiKey) {
     return;
   }
@@ -459,6 +476,18 @@ async function refreshDeepgramBalanceForSavedKey(): Promise<void> {
     renderDeepgramLimitRow('');
     renderDeepgramStatus(getDeepgramBalanceErrorMessage(error));
   }
+}
+
+/** Returns whether the visible Deepgram field matches the last tested and saved key. */
+function hasSavedDeepgramKey(): boolean {
+  return Boolean(savedDeepgramApiKey && deepgramApiKeyInput.value.trim() === savedDeepgramApiKey);
+}
+
+/** Enables the assistant only after ChatGPT login and a tested Deepgram key are present. */
+function updateAssistantButtonState(): void {
+  const enabled = isChatGptLoggedIn && hasSavedDeepgramKey();
+  openButton.disabled = !enabled;
+  openButton.title = enabled ? '' : 'Enter Deepgram API key';
 }
 
 /** Applies a text-button busy state without changing layout. */

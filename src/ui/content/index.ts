@@ -109,5 +109,23 @@ function stopPageMicCapture(): void {
 
 /** Broadcasts tab-originated UI updates through the background runtime channel. */
 function broadcastRuntimeTabMessage(message: TabMessage): void {
-  void chrome.runtime.sendMessage(message).catch(() => undefined);
+  if (!isRuntimeContextAvailable()) {
+    stopPageMicCapture();
+    return;
+  }
+
+  try {
+    void chrome.runtime.sendMessage(message).catch(() => undefined);
+  } catch {
+    stopPageMicCapture();
+  }
+}
+
+/** Returns false after the extension is reloaded and this content script is invalidated. */
+function isRuntimeContextAvailable(): boolean {
+  try {
+    return Boolean(chrome.runtime?.id);
+  } catch {
+    return false;
+  }
 }

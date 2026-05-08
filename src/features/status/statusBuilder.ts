@@ -16,6 +16,8 @@ import {
 import type {
   AccessContext,
   AssistantLanguage,
+  AssistantSettings,
+  AnswerType,
   AvailableModel,
   Result,
   StatusPayload,
@@ -118,20 +120,33 @@ export async function refreshModels(): Promise<Result> {
 
 /** Returns the currently selected assistant model after catalog normalization. */
 export async function getAssistantModel(): Promise<string> {
-  const { settings, catalog } = await getStorage(['settings', 'catalog'] as const);
-  return normalizeAssistantSettings(settings, normalizeAvailableModelsCatalog(catalog?.availableModels)).model;
+  return (await getNormalizedSettings()).model;
 }
 
 /** Returns the currently selected reasoning effort after catalog normalization. */
 export async function getAssistantThinkingVariant(): Promise<ThinkingVariant> {
-  const { settings, catalog } = await getStorage(['settings', 'catalog'] as const);
-  return normalizeAssistantSettings(settings, normalizeAvailableModelsCatalog(catalog?.availableModels)).thinkingVariant;
+  return (await getNormalizedSettings()).thinkingVariant;
 }
 
 /** Returns the currently selected transcript language after settings normalization. */
 export async function getAssistantLanguage(): Promise<AssistantLanguage> {
+  return (await getNormalizedSettings()).language;
+}
+
+/** Returns the selected answer format after settings normalization. */
+export async function getAssistantAnswerType(): Promise<AnswerType> {
+  return (await getNormalizedSettings()).answerType;
+}
+
+/** Returns the optional target position after settings normalization. */
+export async function getAssistantTargetPosition(): Promise<string> {
+  return (await getNormalizedSettings()).targetPosition;
+}
+
+/** Loads persisted settings and normalizes them against the current model catalog. */
+async function getNormalizedSettings(): Promise<Required<AssistantSettings>> {
   const { settings, catalog } = await getStorage(['settings', 'catalog'] as const);
-  return normalizeAssistantSettings(settings, normalizeAvailableModelsCatalog(catalog?.availableModels)).language;
+  return normalizeAssistantSettings(settings, normalizeAvailableModelsCatalog(catalog?.availableModels));
 }
 
 /** Persists partial assistant settings without overwriting unrelated fields. */
@@ -139,6 +154,8 @@ export async function saveAssistantSettings(nextSettings: {
   model?: string;
   thinkingVariant?: ThinkingVariant;
   language?: AssistantLanguage;
+  answerType?: AnswerType;
+  targetPosition?: string;
 }): Promise<void> {
   const { settings = {} } = await getStorage('settings');
   await setStorage({

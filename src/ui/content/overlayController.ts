@@ -3,17 +3,26 @@ import { sendRuntimeMessage } from '../../shared/messaging';
 import { getStorage, setStorage } from '../../shared/storage';
 import { renderMarkdown } from '../../shared/markdownRenderer';
 import { DEEPGRAM_LANGUAGE_OPTIONS, normalizeDeepgramLanguage } from '../../shared/languages';
+import { normalizeAnswerType, normalizeTargetPosition } from '../../shared/settings';
 import { createAssistantOverlayStyles } from './overlayStyles';
-import type { AssistantLanguage, AssistantShowMessage, ConversationMessage } from '../../shared/types';
+import type { AnswerType, AssistantLanguage, AssistantShowMessage, ConversationMessage } from '../../shared/types';
 
 const OVERLAY_ID = 'chatgpt-interview-overlay';
 const STYLE_ID = 'chatgpt-interview-overlay-styles';
+const ANSWER_TYPE_OPTIONS: Array<{ value: AnswerType; label: string }> = [
+  { value: 'keywords', label: 'Keywords' },
+  { value: 'details', label: 'With Details' },
+  { value: 'sentences', label: 'Full Sentences' },
+  { value: 'none', label: 'None' }
+];
 
 interface AssistantState {
   loggedIn: boolean;
   accountEmail: string;
   conversation: ConversationMessage[];
   language: AssistantLanguage;
+  answerType: AnswerType;
+  targetPosition: string;
   interimMicTranscript: string;
   interimSpeakerTranscript: string;
   lastQuestion: string;
@@ -44,6 +53,8 @@ const state: AssistantState = {
   accountEmail: '',
   conversation: [],
   language: 'tr',
+  answerType: 'details',
+  targetPosition: '',
   interimMicTranscript: '',
   interimSpeakerTranscript: '',
   lastQuestion: '',
@@ -70,6 +81,8 @@ export function showAssistantOverlay(message: AssistantShowMessage): void {
   state.accountEmail = message.accountEmail || '';
   state.conversation = Array.isArray(message.conversation) ? message.conversation : [];
   state.language = normalizeDeepgramLanguage(message.language);
+  state.answerType = normalizeAnswerType(message.answerType);
+  state.targetPosition = normalizeTargetPosition(message.targetPosition);
   state.lastAnswer = message.lastAnswer || '';
   state.lastQuestion = findLatestQuestion(state.conversation);
   state.questionDetectionCursor = state.conversation.filter((item) => item.role !== 'assistant').length;
@@ -78,6 +91,9 @@ export function showAssistantOverlay(message: AssistantShowMessage): void {
   const overlay = getOrCreateOverlay();
   overlay.classList.add('is-visible');
   syncLanguageSelect();
+  syncAnswerTypeSelect();
+  syncTargetPositionInput();
+  updateAnswerTypeMode();
   renderConversation();
   renderAnswerPanel();
   renderStatus(state.loggedIn ? 'Ready.' : 'Sign in from the extension popup.');
@@ -135,20 +151,32 @@ function getOrCreateOverlay(): HTMLElement {
     <div id="civ-status" class="civ-status">Ready.</div>
 
     <div class="civ-controls">
-      <div class="civ-control-group">
-        <button id="civ-mic" title="Microphone transcript">Mic</button>
-        <button id="civ-speaker" title="Capture current tab audio">Speaker</button>
-        <button id="civ-answer" title="Generate an answer from the transcript">Answer</button>
-        <button id="civ-clear" title="Clear transcript">Clear</button>
+      <div class="civ-control-row civ-settings-row">
+        <div class="civ-settings-left">
+          <input id="civ-target-position" type="text" maxlength="160" placeholder="(Optional) Target Position" title="Target Position" aria-label="Target Position">
+          <select id="civ-answer-type" class="civ-answer-type" title="Answer type" aria-label="Answer type">
+            ${ANSWER_TYPE_OPTIONS.map((option) => (
+              `<option value="${option.value}">${option.label}</option>`
+            )).join('')}
+          </select>
+          <select id="civ-language" title="Language" aria-label="Language">
+            ${DEEPGRAM_LANGUAGE_OPTIONS.map((option) => (
+              `<option value="${option.value}">${option.label}</option>`
+            )).join('')}
+          </select>
+        </div>
       </div>
-      <div class="civ-actions">
-        <select id="civ-language" title="Transcript language">
-          ${DEEPGRAM_LANGUAGE_OPTIONS.map((option) => (
-            `<option value="${option.value}">${option.label}</option>`
-          )).join('')}
-        </select>
-        <button id="civ-start" class="civ-primary">Start</button>
-        <button id="civ-stop" hidden>Stop</button>
+      <div class="civ-control-row">
+        <div class="civ-control-group">
+          <button id="civ-mic" title="Microphone transcript">Mic</button>
+          <button id="civ-speaker" title="Capture current tab audio">Speaker</button>
+          <button id="civ-answer" title="Generate an answer from the transcript">Answer</button>
+          <button id="civ-clear" title="Clear transcript">Clear</button>
+        </div>
+        <div class="civ-session-actions">
+          <button id="civ-start" class="civ-primary">Start</button>
+          <button id="civ-stop" hidden>Stop</button>
+        </div>
       </div>
     </div>
 
@@ -236,11 +264,21 @@ function bindOverlayEvents(overlay: HTMLElement): void {
   overlay.querySelector<HTMLSelectElement>('#civ-language')?.addEventListener('change', (event) => {
     const value = (event.target as HTMLSelectElement).value;
     state.language = normalizeDeepgramLanguage(value);
-    void saveAssistantLanguage(state.language);
+    void saveSetting({ language: state.language });
     if (state.micOn) {
       stopMic();
       void startMic();
     }
+  });
+  overlay.querySelector<HTMLSelectElement>('#civ-answer-type')?.addEventListener('change', (event) => {
+    const value = (event.target as HTMLSelectElement).value;
+    state.answerType = normalizeAnswerType(value);
+    updateButtons();
+    void saveSetting({ answerType: state.answerType });
+  });
+  overlay.querySelector<HTMLInputElement>('#civ-target-position')?.addEventListener('input', (event) => {
+    state.targetPosition = normalizeTargetPosition((event.target as HTMLInputElement).value);
+    void saveSetting({ targetPosition: state.targetPosition });
   });
 }
 
@@ -289,6 +327,10 @@ function bindPanelResizer(overlay: HTMLElement): void {
 
 /** Requests a manual answer from the selected text or recent transcript. */
 async function generateAnswer(): Promise<void> {
+  if (state.answerType === 'none') {
+    return;
+  }
+
   if (!state.loggedIn) {
     renderStatus('Sign in from the extension popup before generating an answer.', 'error');
     return;
@@ -495,7 +537,7 @@ function handleTranscriptText(
   if (options.persist) {
     void sendRuntimeMessage({ action: 'assistant.transcript.append', text: text.trim(), speaker });
   }
-  if (options.detect) {
+  if (options.detect && shouldDetectQuestions()) {
     void detectQuestionFromTranscript();
   }
   renderLiveState();
@@ -771,7 +813,6 @@ function updateButtons(): void {
   const stop = document.getElementById('civ-stop') as HTMLButtonElement | null;
   const mic = document.getElementById('civ-mic') as HTMLButtonElement | null;
   const speaker = document.getElementById('civ-speaker') as HTMLButtonElement | null;
-  const answer = document.getElementById('civ-answer') as HTMLButtonElement | null;
   if (start) {
     start.hidden = state.started;
     start.disabled = !state.loggedIn;
@@ -789,9 +830,7 @@ function updateButtons(): void {
     speaker.classList.toggle('is-active', state.speakerOn);
     speaker.disabled = !state.loggedIn;
   }
-  if (answer) {
-    answer.disabled = !state.loggedIn;
-  }
+  updateAnswerTypeMode();
   updateQuestionButtons();
 }
 
@@ -827,15 +866,52 @@ function syncLanguageSelect(): void {
   }
 }
 
-/** Persists the selected transcript language in extension storage. */
-async function saveAssistantLanguage(language: AssistantLanguage): Promise<void> {
+/** Keeps the answer type dropdown aligned with the current assistant state. */
+function syncAnswerTypeSelect(): void {
+  const select = document.getElementById('civ-answer-type') as HTMLSelectElement | null;
+  if (select) {
+    select.value = state.answerType;
+  }
+}
+
+/** Keeps the target position input aligned with the current assistant state. */
+function syncTargetPositionInput(): void {
+  const input = document.getElementById('civ-target-position') as HTMLInputElement | null;
+  if (input) {
+    input.value = state.targetPosition;
+  }
+}
+
+/** Toggles answer panel, divider, and answer button visibility based on the current answer type. */
+function updateAnswerTypeMode(): void {
+  const transcriptOnly = state.answerType === 'none';
+  const body = document.querySelector<HTMLElement>(`#${OVERLAY_ID} .civ-body`);
+  const divider = document.getElementById('civ-divider');
+  const answerPanel = document.querySelector<HTMLElement>(`#${OVERLAY_ID} .civ-answer-panel`);
+  const answerButton = document.getElementById('civ-answer') as HTMLButtonElement | null;
+
+  body?.classList.toggle('is-transcript-only', transcriptOnly);
+  if (divider) {
+    divider.hidden = transcriptOnly;
+  }
+  if (answerPanel) {
+    answerPanel.hidden = transcriptOnly;
+  }
+  if (answerButton) {
+    answerButton.hidden = transcriptOnly;
+    answerButton.disabled = transcriptOnly || !state.loggedIn;
+  }
+}
+
+/** Persists a partial assistant settings update without overwriting unrelated fields. */
+async function saveSetting(patch: Record<string, unknown>): Promise<void> {
   const { settings = {} } = await getStorage('settings');
-  await setStorage({
-    settings: {
-      ...settings,
-      language
-    }
-  });
+  await setStorage({ settings: { ...settings, ...patch } });
+}
+
+/** Returns whether automatic question detection should run for transcript updates. */
+function shouldDetectQuestions(): boolean {
+  return state.answerType !== 'none';
 }
 
 /** Builds a short status sentence for the active capture channels. */

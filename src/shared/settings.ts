@@ -3,6 +3,7 @@ import { DEFAULT_TRANSCRIPT_LANGUAGE, normalizeDeepgramLanguage } from './langua
 import type {
   AssistantLanguage,
   AssistantSettings,
+  AnswerType,
   AvailableModel,
   ExtensionStorage,
   InputModality,
@@ -11,8 +12,9 @@ import type {
 } from './types';
 
 export const DEFAULT_MODEL = 'gpt-5.4-mini';
-export const DEFAULT_THINKING_VARIANT: ThinkingVariant = 'medium';
+export const DEFAULT_THINKING_VARIANT: ThinkingVariant = 'low';
 export const DEFAULT_LANGUAGE: AssistantLanguage = DEFAULT_TRANSCRIPT_LANGUAGE;
+export const DEFAULT_ANSWER_TYPE: AnswerType = 'details';
 export const DEFAULT_CODEX_CLIENT_VERSION = '0.128.0';
 export const STORAGE_KEYS = Object.freeze([
   'auth',
@@ -56,8 +58,22 @@ export function normalizeAssistantSettings(
   return {
     model,
     thinkingVariant: normalizeThinkingVariant(settings?.thinkingVariant, model, availableModels),
-    language: normalizeDeepgramLanguage(settings?.language)
+    language: normalizeDeepgramLanguage(settings?.language),
+    answerType: normalizeAnswerType(settings?.answerType),
+    targetPosition: normalizeTargetPosition(settings?.targetPosition)
   };
+}
+
+/** Normalizes stored answer format preference for prompt shaping. */
+export function normalizeAnswerType(value: unknown): AnswerType {
+  return value === 'keywords' || value === 'details' || value === 'sentences' || value === 'none'
+    ? value
+    : DEFAULT_ANSWER_TYPE;
+}
+
+/** Normalizes the optional target role used to shape interview answers. */
+export function normalizeTargetPosition(value: unknown): string {
+  return normalizeOptionalString(value).slice(0, 160);
 }
 
 /** Returns a valid model id, falling back to the catalog default. */
@@ -148,7 +164,11 @@ export function getDefaultThinkingVariantForModel(
   selectedModel: string,
   availableModels: AvailableModel[] = getAvailableModels()
 ): ThinkingVariant {
-  return findAvailableModel(selectedModel, availableModels)?.defaultThinkingVariant
+  const selectedModelEntry = findAvailableModel(selectedModel, availableModels);
+  if (selectedModel === DEFAULT_MODEL && selectedModelEntry?.thinkingVariants.some((variant) => variant.value === DEFAULT_THINKING_VARIANT)) {
+    return DEFAULT_THINKING_VARIANT;
+  }
+  return selectedModelEntry?.defaultThinkingVariant
     || availableModels.find((model) => model.isDefault)?.defaultThinkingVariant
     || DEFAULT_THINKING_VARIANT;
 }
@@ -165,7 +185,10 @@ export function getAvailableModels(): AvailableModel[] {
 
 /** Returns the default model id from a catalog. */
 export function getDefaultAvailableModel(models: AvailableModel[]): string {
-  return models.find((model) => model.isDefault)?.model || models[0]?.model || DEFAULT_MODEL;
+  return models.find((model) => model.model === DEFAULT_MODEL)?.model
+    || models.find((model) => model.isDefault)?.model
+    || models[0]?.model
+    || DEFAULT_MODEL;
 }
 
 /** Returns cloned fallback reasoning options. */

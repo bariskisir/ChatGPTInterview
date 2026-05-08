@@ -42,7 +42,8 @@ html.civ-sidepanel #${overlayId} {
 #${overlayId} [hidden] { display: none !important; }
 #${overlayId} * { box-sizing: border-box; letter-spacing: 0; }
 #${overlayId} button,
-#${overlayId} select {
+#${overlayId} select,
+#${overlayId} input {
   height: 24px;
   border: 1px solid rgba(15, 23, 42, 0.14);
   border-radius: 6px;
@@ -52,14 +53,19 @@ html.civ-sidepanel #${overlayId} {
   font-size: 9px;
   font-weight: 600;
 }
+#${overlayId} input {
+  min-width: 0;
+  padding: 0 7px;
+}
 #${overlayId} button { cursor: pointer; }
 #${overlayId} button:hover:not(:disabled) { background: #eef2f7; }
 #${overlayId} button:disabled { cursor: default; opacity: 0.55; }
 #${overlayId} .civ-controls,
 #${overlayId} .civ-panel-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   gap: 6px;
   padding: 6px 8px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.1);
@@ -70,12 +76,38 @@ html.civ-sidepanel #${overlayId} {
   flex: 0 0 auto;
 }
 #${overlayId} .civ-controls { flex-wrap: nowrap; }
+#${overlayId} .civ-panel-head {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
 #${overlayId} .civ-controls button { padding: 0 6px; }
+#${overlayId} .civ-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
 #${overlayId} .civ-control-group { display: flex; flex: 1 1 auto; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
 #${overlayId} .civ-control-group button { flex: 0 0 auto; }
-#${overlayId} .civ-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; flex-wrap: nowrap; justify-content: flex-end; }
-#${overlayId} .civ-actions select { width: 86px; min-width: 0; max-width: 86px; }
-#${overlayId} .civ-actions button { flex: 0 0 auto; }
+#${overlayId} .civ-settings-row { align-items: center; }
+#${overlayId} .civ-settings-left {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px 86px;
+  flex: 1 1 auto;
+  gap: 6px;
+  min-width: 0;
+}
+#${overlayId} .civ-settings-left select { width: 100%; min-width: 0; }
+#${overlayId} .civ-session-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+#${overlayId} .civ-session-actions button { flex: 0 0 auto; }
 #${overlayId} .civ-primary { min-width: 48px; background: #0f766e; border-color: #0f766e; color: #fff; }
 #${overlayId} .civ-primary:hover:not(:disabled) { background: #115e59; }
 #${overlayId} .civ-status {
@@ -93,6 +125,9 @@ html.civ-sidepanel #${overlayId} {
   min-height: 0;
   overflow: hidden;
   grid-template-rows: var(--civ-transcript-height, 136px) 8px minmax(0, 1fr);
+}
+#${overlayId} .civ-body.is-transcript-only {
+  grid-template-rows: minmax(0, 1fr);
 }
 #${overlayId} .civ-panel,
 #${overlayId} .civ-answer-panel {
@@ -240,6 +275,7 @@ html.civ-sidepanel #${overlayId} {
 @media (max-width: 720px) {
   #${overlayId} { inset: 8px; width: auto; min-width: 0; height: calc(100vh - 16px); max-height: calc(100vh - 16px); }
   #${overlayId} .civ-body { grid-template-rows: var(--civ-transcript-height, 128px) 8px minmax(0, 1fr); }
+  #${overlayId} .civ-body.is-transcript-only { grid-template-rows: minmax(0, 1fr); }
   #${overlayId} .civ-answer-text { max-height: none; }
 }
   `;

@@ -5,7 +5,13 @@ import { getStorage } from '../../shared/storage';
 import { getErrorMessage } from '../../shared/errors';
 import { normalizeDeepgramLanguage } from '../../shared/languages';
 import { ensureAuthenticated } from '../auth/loginFlow';
-import { getAssistantLanguage, getAssistantModel, getAssistantThinkingVariant } from '../status/statusBuilder';
+import {
+  getAssistantAnswerType,
+  getAssistantLanguage,
+  getAssistantModel,
+  getAssistantTargetPosition,
+  getAssistantThinkingVariant
+} from '../status/statusBuilder';
 import {
   appendConversation,
   clearAssistantState,
@@ -211,11 +217,13 @@ async function generateAnswerForQuestion(
     if (autoAnswerKey) {
       await markAutoAnswer(question);
     }
-    const [model, reasoningEffort] = await Promise.all([
+    const [model, reasoningEffort, answerType, targetPosition] = await Promise.all([
       getAssistantModel(),
-      getAssistantThinkingVariant()
+      getAssistantThinkingVariant(),
+      getAssistantAnswerType(),
+      getAssistantTargetPosition()
     ]);
-    const answer = await requestInterviewAnswer(question, tabId, model, reasoningEffort, language);
+    const answer = await requestInterviewAnswer(question, tabId, model, reasoningEffort, language, answerType, targetPosition);
     await appendConversation([{ role: 'assistant', text: answer, createdAt: Date.now() }]);
     await publishAssistantAnswer(tabId, answer, question);
   } catch (error) {

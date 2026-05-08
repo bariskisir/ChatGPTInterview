@@ -48,6 +48,8 @@ async function refreshSidePanel(): Promise<void> {
     accountEmail: status.auth.accountEmail,
     lastAnswer: status.assistant.lastAnswer,
     conversation: status.assistant.conversation,
-    language: status.settings.language
+    language: status.settings.language,
+    answerType: status.settings.answerType,
+    targetPosition: status.settings.targetPosition
   });
 }

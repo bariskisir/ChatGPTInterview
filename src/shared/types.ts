@@ -5,6 +5,7 @@ export type AssistantLanguage = DeepgramLanguageCode;
 export type ResponseStyle = 'low' | 'medium' | 'high';
 export type ThinkingVariant = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 export type InputModality = 'text' | 'image';
+export type AnswerType = 'keywords' | 'details' | 'sentences' | 'none';
 
 export interface PendingOAuth {
   state: string;
@@ -27,6 +28,8 @@ export interface AssistantSettings {
   model?: string;
   thinkingVariant?: ThinkingVariant;
   language?: AssistantLanguage;
+  answerType?: AnswerType;
+  targetPosition?: string;
 }
 
 export interface CandidateProfileStorage {
@@ -152,6 +155,8 @@ export interface StatusPayload {
     model: string;
     thinkingVariant: ThinkingVariant;
     language: AssistantLanguage;
+    answerType: AnswerType;
+    targetPosition: string;
   };
   profile: {
     fileName: string;
@@ -279,6 +284,8 @@ export interface AssistantShowMessage {
   lastAnswer?: string;
   conversation?: ConversationMessage[];
   language?: AssistantLanguage;
+  answerType?: AnswerType;
+  targetPosition?: string;
 }
 
 export interface AssistantHideMessage {

@@ -4,9 +4,15 @@ import { getDeepgramLanguageLabel } from '../../shared/languages';
 import { getStorage } from '../../shared/storage';
 import { callChatGpt } from '../../api/chatgpt';
 import { publishAssistantAnswer } from './uiPublisher';
-import type { AssistantLanguage, ThinkingVariant } from '../../shared/types';
+import type { AnswerType, AssistantLanguage, ThinkingVariant } from '../../shared/types';
 
 const MAX_PROFILE_PROMPT_CHARS = 12_000;
+const ANSWER_TYPE_INSTRUCTIONS = Object.freeze<Record<AnswerType, string>>({
+  keywords: 'Answer as quick keywords or very short bullet points only. Make it easy to glance at during conversation.',
+  details: 'Answer with bullet points that include concise context and explanations. Keep each bullet practical and interview-ready.',
+  sentences: 'Answer in natural full sentences that the interviewee can read aloud word-for-word.',
+  none: ''
+});
 
 /** Builds the interview prompt from user input, settings, and optional CV context. */
 export async function requestInterviewAnswer(
@@ -14,11 +20,14 @@ export async function requestInterviewAnswer(
   tabId: number | null,
   model: string,
   reasoningEffort: ThinkingVariant,
-  language: AssistantLanguage
+  language: AssistantLanguage,
+  answerType: AnswerType,
+  targetPosition: string
 ): Promise<string> {
   const profileContext = await getCandidateProfileContext();
   const prompt = [
     profileContext,
+    getTargetPositionContext(targetPosition),
     `Question or task:\n${question}`,
     getLanguageInstruction(language),
     'Return the answer in a form the interviewee can say naturally. Keep it concise unless code or steps are required.',
@@ -29,12 +38,23 @@ export async function requestInterviewAnswer(
     prompt,
     model,
     reasoningEffort,
-    instructions: INTERVIEW_SYSTEM_PROMPT,
+    instructions: [INTERVIEW_SYSTEM_PROMPT, getAnswerTypeInstruction(answerType)].filter(Boolean).join(' '),
     responseStyle: 'medium',
     onTextUpdate: (partialAnswer) => {
       void publishAssistantAnswer(tabId, partialAnswer, question, { streaming: true });
     }
   });
+}
+
+/** Returns optional target role context, matching MeetAssist's position-oriented answer shaping. */
+function getTargetPositionContext(targetPosition: string): string {
+  const normalizedPosition = targetPosition.trim();
+  return normalizedPosition ? `Target position:\n${normalizedPosition}` : '';
+}
+
+/** Returns MeetAssist-style answer shape instructions for the selected answer type. */
+function getAnswerTypeInstruction(answerType: AnswerType): string {
+  return ANSWER_TYPE_INSTRUCTIONS[answerType];
 }
 
 /** Reads the locally stored CV/profile text and constrains it for prompt use. */
