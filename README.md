@@ -2,6 +2,9 @@
 
 ChatGPT Interview is a local Chrome extension that helps with live interview preparation and practice. It captures microphone and current-tab audio, transcribes speech with Deepgram, detects interview questions, and drafts concise answers through ChatGPT.
 
+Desktop App -> https://github.com/bariskisir/Interview
+
+
 <img src="images/interface.png" alt="ChatGPT Interview popup" width="80%">
 
 ---
